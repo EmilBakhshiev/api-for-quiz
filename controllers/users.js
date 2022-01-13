@@ -11,21 +11,39 @@ dotenv.config();
 
 const { NODE_ENV, JWT_SECRET } = process.env;
 
+const getMyUser = (req, res, next) => {
+  User.findById(req.user._id)
+    .orFail(() => {
+      throw new NotFoundError('Пользователя с таким id не существует');
+    })
+    .then((user) => res.send(user))
+    .catch((err) => {
+      if (err.name === 'CastError') {
+        next(new ValidationError('Id не верный'));
+      } else {
+        next(err);
+      }
+    });
+};
 
 const createUser = (req, res, next) => {
-  const { email, password } = req.body;
+  const { name, email, password } = req.body;
   if (!email || !password) {
     throw new AuthError('Пароль или почта некорректны');
   }
   bcrypt.hash(password, 10).then((hash) => {
     User.create({
+      name,
       email,
       password: hash,
     })
-      .then((user) => res.status(200).send({
-        _id: user._id,
-        email: user.email,
-      }))
+      .then((user) =>
+        res.status(200).send({
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+        })
+      )
       .catch((err) => {
         if (err.name === 'MongoError' || err.code === 11000) {
           next(new DuplicateError('Пользователь с таким email уже существует'));
@@ -38,7 +56,6 @@ const createUser = (req, res, next) => {
   });
 };
 
-
 const login = (req, res, next) => {
   const { email, password } = req.body;
   return User.findUserByCredentials(email, password)
@@ -48,7 +65,7 @@ const login = (req, res, next) => {
         `${NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret'}`,
         {
           expiresIn: '7d',
-        },
+        }
       );
       res.send({ token });
     })
@@ -59,7 +76,7 @@ const login = (req, res, next) => {
 };
 
 module.exports = {
+  getMyUser,
   createUser,
   login,
-
 };

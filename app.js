@@ -4,9 +4,9 @@ const app = express();
 const dotenv = require('dotenv');
 const Quiz = require('./models/quiz');
 const cors = require('cors');
-const { createUser, login } = require('./controllers/users');
+const { createUser, login, getMyUser } = require('./controllers/users');
+const { auth } = require('./middlewares/auth');
 const { PORT = 3005 } = process.env;
-
 
 dotenv.config();
 app.use(cors());
@@ -20,7 +20,9 @@ mongoose.connect('mongodb://localhost:27017/quizapp', {
 });
 
 app.post('/signup', createUser);
-app.post('/signin',  login);
+app.post('/signin', login);
+
+app.get('/me', auth, getMyUser)
 
 app.post('/quiz', async (req, res) => {
   const { name, questions } = req.body;
@@ -51,6 +53,21 @@ app.get('/allquizzes', async (req, res) => {
   try {
     let quizzes = await Quiz.find({});
     res.json(quizzes);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+app.patch('/:quizId/statistics', async (req, res) => {
+  const { name ,score } = req.body;
+  try {
+    await Quiz.findByIdAndUpdate(
+      req.params.quizId,
+      { $addToSet: { statistics: {name: name, score: score}} },
+      { new: true, runValidators: true }
+    );
+    
   } catch (error) {
     console.error(error.message);
     res.status(500).send('Server Error');
